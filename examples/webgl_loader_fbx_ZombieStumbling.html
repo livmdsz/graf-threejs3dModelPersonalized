@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+	<title>Modelo 1 - Zombie Stumbling</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+	<style>
+		body {
+			margin: 0;
+			overflow: hidden;
+			background-color: #a0a0a0;
+			font-family: Arial, sans-serif;
+		}
+
+		#info {
+			position: absolute;
+			top: 10px;
+			width: 100%;
+			text-align: center;
+			color: #ffffff;
+			z-index: 10;
+			font-size: 15px;
+		}
+
+		#error {
+			position: absolute;
+			top: 50px;
+			left: 10px;
+			color: #ff0000;
+			background: white;
+			padding: 10px;
+			z-index: 20;
+			display: none;
+		}
+	</style>
+</head>
+
+<body>
+
+	<div id="info">
+		Modelo 1: Zombie Stumbling | Textura personalizada Pixeles
+	</div>
+
+	<div id="error"></div>
+
+	<script type="importmap">
+    {
+        "imports": {
+            "three": "../build/three.module.js",
+            "three/addons/": "./jsm/"
+        }
+    }
+    </script>
+
+	<script type="module">
+
+		import * as THREE from 'three';
+
+		import { OrbitControls } from
+			'three/addons/controls/OrbitControls.js';
+
+		import { FBXLoader } from
+			'three/addons/loaders/FBXLoader.js';
+
+
+		let camera, scene, renderer, controls;
+		let mixer;
+		let object;
+
+		const clock = new THREE.Clock();
+
+		const errorBox = document.getElementById('error');
+
+		function showError(message) {
+			errorBox.style.display = 'block';
+			errorBox.textContent = message;
+			console.error(message);
+		}
+
+
+		// Inicialización de la escena
+		init();
+
+
+		function init() {
+
+			// Cámara
+			camera = new THREE.PerspectiveCamera(
+				45,
+				window.innerWidth / window.innerHeight,
+				1,
+				2000
+			);
+
+			camera.position.set(100, 200, 300);
+
+
+			// Escena
+			scene = new THREE.Scene();
+
+			scene.background = new THREE.Color(0xa0a0a0);
+
+			scene.fog = new THREE.Fog(
+				0xa0a0a0,
+				200,
+				1000
+			);
+
+
+			// Iluminación ambiental
+			const hemiLight = new THREE.HemisphereLight(
+				0xffffff,
+				0x444444,
+				2
+			);
+
+			hemiLight.position.set(0, 200, 0);
+
+			scene.add(hemiLight);
+
+
+			// Luz direccional superior
+			const dirLight = new THREE.DirectionalLight(
+				0xffffff,
+				3
+			);
+
+			dirLight.position.set(0, 300, 0);
+
+			dirLight.castShadow = true;
+
+			dirLight.shadow.mapSize.set(2048, 2048);
+
+			dirLight.shadow.camera.top = 180;
+			dirLight.shadow.camera.bottom = -100;
+			dirLight.shadow.camera.left = -120;
+			dirLight.shadow.camera.right = 120;
+
+			scene.add(dirLight);
+
+
+			// Suelo
+			const ground = new THREE.Mesh(
+				new THREE.PlaneGeometry(2000, 2000),
+				new THREE.MeshPhongMaterial({
+					color: 0x999999,
+					depthWrite: false
+				})
+			);
+
+			ground.rotation.x = -Math.PI / 2;
+
+			ground.receiveShadow = true;
+
+			scene.add(ground);
+
+
+			// Cuadrícula
+			const grid = new THREE.GridHelper(
+				2000,
+				20,
+				0x000000,
+				0x000000
+			);
+
+			grid.material.opacity = 0.2;
+			grid.material.transparent = true;
+
+			scene.add(grid);
+
+
+			// Renderizador
+			renderer = new THREE.WebGLRenderer({
+				antialias: true
+			});
+
+			renderer.setPixelRatio(window.devicePixelRatio);
+
+			renderer.setSize(
+				window.innerWidth,
+				window.innerHeight
+			);
+
+			renderer.shadowMap.enabled = true;
+
+			renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+			document.body.appendChild(renderer.domElement);
+
+
+			// Controles de cámara
+			controls = new OrbitControls(
+				camera,
+				renderer.domElement
+			);
+
+			controls.enableZoom = true;
+			controls.enablePan = false;
+			controls.enableDamping = true;
+
+			controls.target.set(0, 100, 0);
+
+			controls.update();
+
+
+			// Cargar textura personalizada
+			const textureLoader = new THREE.TextureLoader();
+
+			textureLoader.load(
+				'./textures/Pixeles.jpeg',
+
+				function (texture) {
+
+					texture.colorSpace = THREE.SRGBColorSpace;
+
+					texture.wrapS = THREE.RepeatWrapping;
+					texture.wrapT = THREE.RepeatWrapping;
+
+					texture.anisotropy =
+						renderer.capabilities.getMaxAnisotropy();
+
+					console.log('Textura Pixeles cargada correctamente');
+
+					// Cargar modelo FBX
+					loadModel(texture);
+
+				},
+
+				undefined,
+
+				function (error) {
+
+					showError(
+						'No se pudo cargar Pixeles.jpeg. ' +
+						'Verifica la carpeta examples/textures.'
+					);
+
+				}
+			);
+
+
+			window.addEventListener(
+				'resize',
+				onWindowResize
+			);
+
+
+			animate();
+
+		}
+
+
+		// Cargar modelo Zombie Stumbling
+		function loadModel(texture) {
+
+			const loader = new FBXLoader();
+
+			loader.load(
+
+				'models/fbx/Zombie Stumbling.fbx',
+
+				function (group) {
+
+					object = group;
+
+					object.scale.setScalar(1);
+
+					// Aplicar material y textura
+					object.traverse(function (child) {
+
+						if (child.isMesh) {
+
+							child.castShadow = true;
+
+							child.receiveShadow = true;
+
+							child.material =
+								new THREE.MeshPhongMaterial({
+
+									map: texture,
+
+									color: 0xffffff,
+
+									specular: 0xffffff,
+
+									shininess: 90,
+
+									reflectivity: 0.35,
+
+									transparent: false,
+
+									opacity: 1,
+
+									side: THREE.DoubleSide
+
+								});
+
+						}
+
+					});
+
+
+					// Agregar modelo a la escena
+					scene.add(object);
+
+
+					// Reproducir animación
+					if (
+						object.animations &&
+						object.animations.length > 0
+					) {
+
+						mixer = new THREE.AnimationMixer(object);
+
+						const action = mixer.clipAction(
+							object.animations[0]
+						);
+
+						action.play();
+
+						console.log(
+							'Animación ejecutándose:',
+							object.animations[0].name
+						);
+
+					} else {
+
+						console.warn(
+							'El modelo no contiene animaciones.'
+						);
+
+					}
+
+					console.log(
+						'Zombie Stumbling cargado correctamente'
+					);
+
+				},
+
+				function (xhr) {
+
+					if (xhr.total > 0) {
+
+						console.log(
+							'Cargando modelo:',
+							(xhr.loaded / xhr.total * 100).toFixed(0),
+							'%'
+						);
+
+					}
+
+				},
+
+				function (error) {
+
+					showError(
+						'No se pudo cargar Zombie Stumbling.fbx. ' +
+						'Verifica la carpeta models/fbx.'
+					);
+
+				}
+
+			);
+
+		}
+
+
+		// Ajustar ventana
+		function onWindowResize() {
+
+			camera.aspect =
+				window.innerWidth / window.innerHeight;
+
+			camera.updateProjectionMatrix();
+
+			renderer.setSize(
+				window.innerWidth,
+				window.innerHeight
+			);
+
+		}
+
+
+		// Animación
+		function animate() {
+
+			requestAnimationFrame(animate);
+
+			const delta = clock.getDelta();
+
+			if (mixer) {
+
+				mixer.update(delta);
+
+			}
+
+			controls.update();
+
+			renderer.render(scene, camera);
+
+		}
+
+	</script>
+
+</body>
+
+</html>
